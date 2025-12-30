@@ -9,7 +9,7 @@ import { getSettings, setSettings } from '@/lib/storage/settings';
 import { appendErrorLog, clearErrorLog, getErrorLog, getLastError, isCommentHandled, markCommentHandled } from '@/lib/storage/localState';
 import type { ErrorLogEntry } from '@/lib/storage/localState';
 import { sha256Hex } from '@/lib/util/hash';
-import { clampTextChars, normalizeForComment } from '@/lib/util/text';
+import { clampTextChars, normalizeForComment, stripUrls } from '@/lib/util/text';
 import { isLoopbackHostname, parseUrlWithHttpFallback } from '@/lib/util/url';
 
 type CacheEntry = {
@@ -25,11 +25,23 @@ function now() {
   return Date.now();
 }
 
-function buildRelatedLinks(results: SearchResult[], limit: number) {
-  const top = results.slice(0, limit);
-  if (top.length === 0) return '';
-  const lines = ['관련 글:', ...top.map((r, i) => `${i + 1}) ${r.title} - ${r.url}`)];
-  return `\n\n${lines.join('\n')}`;
+function filterSearchResultsToGallery(results: SearchResult[], galleryId: string) {
+  const id = galleryId.trim();
+  if (!id) return [];
+  const out: SearchResult[] = [];
+  for (const r of results) {
+    const raw = (r.url ?? '').trim();
+    if (!raw) continue;
+    try {
+      const u = new URL(raw);
+      const rid = (u.searchParams.get('id') ?? '').trim();
+      if (rid !== id) continue;
+      out.push(r);
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return out;
 }
 
 function extractKeyword(question: string) {
@@ -211,17 +223,19 @@ export function createDcbotService(): DcbotRpc {
   async function dcSearch(keyword: string, limit?: number) {
     const settings = await getSettings();
     if (!keyword.trim()) return [];
+    if (!settings.searchEnabled) return [];
 
     const realLimit = typeof limit === 'number' ? Math.max(0, Math.min(10, Math.trunc(limit))) : settings.searchLimit;
     if (realLimit <= 0) return [];
 
-    return await dcinsideSearch({
+    const results = await dcinsideSearch({
       galleryId: settings.galleryId,
       isMgallery: settings.isMgallery,
       keyword,
       limit: realLimit,
       timeoutMs: 8_000,
     });
+    return filterSearchResultsToGallery(results, settings.galleryId);
   }
 
   async function generateAnswer(input: GenerateAnswerInput): Promise<GenerateAnswerResult> {
@@ -262,7 +276,6 @@ export function createDcbotService(): DcbotRpc {
       const limitKey = pageKey.length > 0 ? pageKey : 'global';
       enforceRateLimit(limitKey, settings.maxGenerationsPerMinute);
 
-      let searchResults: SearchResult[] | undefined;
       let instructions: string;
       let llmInput: string;
 
@@ -277,38 +290,10 @@ export function createDcbotService(): DcbotRpc {
           maxAnswerChars: settings.maxAnswerChars,
         }));
       } else {
-        const keyword = settings.searchEnabled ? extractKeyword(question) : '';
-        if (settings.searchEnabled && keyword.length > 0) {
-          try {
-            const pageGalleryId = (input.pageGalleryId ?? '').trim();
-            const galleryId = pageGalleryId.length > 0 ? pageGalleryId : settings.galleryId;
-            const isMgallery = typeof input.pageIsMgallery === 'boolean' ? input.pageIsMgallery : settings.isMgallery;
-            searchResults = await dcinsideSearch({
-              galleryId,
-              isMgallery,
-              keyword,
-              limit: settings.searchLimit,
-              timeoutMs: 8_000,
-            });
-          } catch (error) {
-            const detail =
-              error instanceof DcinsideSearchTimeoutError
-                ? `timeout (${error.timeoutMs}ms)`
-                : error instanceof DcinsideSearchHttpError
-                  ? `http (${error.status})`
-                  : String(error);
-            await appendErrorLogDeduped({ ts: now(), scope: 'background', message: 'DCInside 검색 실패', detail });
-          }
-        }
-
         ({ instructions, input: llmInput } = buildPrompt({
           question,
-          postTitle: input.postTitle,
-          postBodyText: input.postBodyText,
-          recentComments: input.recentComments,
-          searchResults,
           maxAnswerChars: settings.maxAnswerChars,
-          includeSources: settings.includeSources,
+          userInstructions: settings.qaUserInstructions,
         }));
       }
 
@@ -329,7 +314,7 @@ export function createDcbotService(): DcbotRpc {
               input: llmInput,
               model: settings.model,
               reasoningEffort: settings.reasoningEffort,
-              searchResults: (searchResults ?? []).slice(0, settings.searchLimit),
+              searchResults: [],
             },
           });
         } else if (settings.providerMode === 'openai_direct') {
@@ -438,16 +423,14 @@ export function createDcbotService(): DcbotRpc {
         throw error;
       }
 
-      let answer = normalizeForComment(answerText);
-
-      if (mode !== 'summary' && settings.includeSources && (searchResults?.length ?? 0) > 0) {
-        answer += buildRelatedLinks(searchResults ?? [], Math.min(3, settings.searchLimit));
-      }
+      let answer = normalizeForComment(stripUrls(answerText)).replace(/\s*-\s*$/gm, '').trim();
+      answer = normalizeForComment(answer);
+      if (!answer) answer = '답변이 비어있어요. 질문을 더 구체적으로 써줘.';
 
       answer = clampTextChars(answer, settings.maxAnswerChars);
-      cache.set(cacheKey, { answer, ts: now(), searchResults });
+      cache.set(cacheKey, { answer, ts: now() });
 
-      return { answer, searchResults, cached: false };
+      return { answer, searchResults: undefined, cached: false };
     } finally {
       release();
     }

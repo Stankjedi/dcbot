@@ -2,20 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { buildPrompt } from '@/lib/llm/prompt';
 
 describe('buildPrompt', () => {
-  it('includes question and optional context', () => {
+  it('includes question and core constraints', () => {
     const { instructions, input } = buildPrompt({
       question: '1 더하기 1?',
-      postTitle: '제목',
-      postBodyText: '본문',
-      recentComments: ['댓글1', '댓글2'],
-      searchResults: [{ num: '1', title: '글', url: 'https://example.com', date: '2025-12-28', name: 'ㅇㅇ' }],
       maxAnswerChars: 800,
-      includeSources: true,
     });
-    expect(instructions).toContain('관련 글');
+    expect(instructions).toContain('링크');
     expect(input).toContain('질문: 1 더하기 1?');
-    expect(input).toContain('현재 글 제목: 제목');
-    expect(input).toContain('갤러리 검색 결과');
+    expect(input).not.toContain('https://');
+  });
+
+  it('includes user instructions when provided', () => {
+    const { instructions } = buildPrompt({
+      question: '안녕',
+      maxAnswerChars: 120,
+      userInstructions: '반말로 짧게',
+    });
+    expect(instructions).toContain('추가 지침');
+    expect(instructions).toContain('반말로 짧게');
+    expect(instructions).toContain('@ 기호는 절대 포함하지 마.');
+    expect(instructions).toContain('링크(URL)는 절대 포함하지 마.');
   });
 });
-

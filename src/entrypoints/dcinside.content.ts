@@ -97,7 +97,7 @@ export default defineContentScript({
       const style = document.createElement('style');
       style.id = 'dcbot-style';
       style.textContent = `
-        .dcbot-ui{margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:8px;background:rgba(0,0,0,.02);font-size:12px;line-height:1.4}
+        .dcbot-ui{clear:both;display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid rgba(0,0,0,.08);border-radius:8px;background:rgba(0,0,0,.02);font-size:12px;line-height:1.4}
         .dcbot-ui__row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
         .dcbot-ui__btn{border:1px solid rgba(0,0,0,.18);background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer}
         .dcbot-ui__btn[disabled]{opacity:.5;cursor:not-allowed}
@@ -211,7 +211,7 @@ export default defineContentScript({
       return [
         `사용법: ${trigger} <질문>`,
         `예시: ${trigger} 1 더하기 1이 뭐야?`,
-        `명령: ${trigger} help / ${trigger} 검색:키워드 / ${trigger} 요약:이 글 / ${trigger} 설정`,
+        `명령: ${trigger} help / ${trigger} 검색:키워드(제목만) / ${trigger} 요약:이 글 / ${trigger} 설정`,
       ].join('\n');
     }
 
@@ -277,8 +277,7 @@ export default defineContentScript({
         console.log('[DCBot] handleGenerate 시작:', { commentId, commentText: commentText.slice(0, 50) });
 
         const question = adapter.extractQuestion(commentText, settings.trigger);
-        const { title, bodyText } = getPostContext();
-        console.log('[DCBot] 질문 추출 완료:', { question: question.slice(0, 50), titleLen: title?.length, bodyLen: bodyText?.length });
+        console.log('[DCBot] 질문 추출 완료:', { question: question.slice(0, 50) });
 
         console.log('[DCBot] 백그라운드 서비스 호출 시작...');
         const svc = getDcbotService();
@@ -324,6 +323,7 @@ export default defineContentScript({
         if (summaryMatch) {
           op = 'summary';
           const rest = (summaryMatch[1] ?? '').trim();
+          const { title, bodyText } = getPostContext();
           const result = await svc.generateAnswer({
             commentId,
             question: rest,
@@ -353,14 +353,27 @@ export default defineContentScript({
 
         if (/^(검색|search)\s*:/i.test(qTrim)) {
           op = 'search';
+          if (!settings.searchEnabled) {
+            const answer = clampAnswer('옵션에서 “내부 검색 사용”을 켜주세요.');
+            if (preview) {
+              preview.textContent = answer;
+              preview.style.display = '';
+            }
+            if (status) status.textContent = '완료';
+            if (btnInsert) btnInsert.disabled = false;
+            (ui as any)._dcbotAnswer = answer;
+            if (settings.autoSubmit) {
+              processing.delete(commentId);
+              await handleInsert(nodeEl, commentId, ui);
+            }
+            return;
+          }
           const keyword = qTrim.replace(/^(검색|search)\s*:/i, '').trim();
           const results = keyword ? await svc.dcSearch(keyword, settings.searchLimit) : [];
           const answer = clampAnswer(
             results.length === 0
               ? '검색 결과가 없어요.'
-              : ['관련 글:', ...results.slice(0, Math.min(5, settings.searchLimit)).map((r, i) => `${i + 1}) ${r.title} - ${r.url}`)].join(
-                '\n',
-              ),
+              : ['검색 결과(제목):', ...results.slice(0, Math.min(5, settings.searchLimit)).map((r, i) => `${i + 1}) ${r.title}`)].join('\n'),
           );
           if (preview) {
             preview.textContent = answer;
@@ -401,9 +414,9 @@ export default defineContentScript({
           pageUrl: location.href,
           pageGalleryId: pageGallery?.galleryId,
           pageIsMgallery: pageGallery?.isMgallery,
-          postTitle: title,
-          postBodyText: bodyText,
-          recentComments: getRecentCommentsContext(nodeEl),
+          postTitle: undefined,
+          postBodyText: undefined,
+          recentComments: undefined,
         });
         console.log('[DCBot] generateAnswer 완료!', { answerLen: result.answer?.length, cached: result.cached });
         const answer = clampAnswer(result.answer);
@@ -499,6 +512,9 @@ export default defineContentScript({
         await svc.markCommentHandled(commentId);
         ui.setAttribute('data-dcbot-handled', '1');
         nodeEl.setAttribute('data-dcbot-handled', '1');
+
+        // Clean up injected UI to keep DCInside's original layout.
+        ui.remove();
       } catch (error) {
         const msg = toUserMessage(error);
         const diag = adapter.collectDiagnostics({ el: nodeEl, id: commentId });
@@ -519,6 +535,13 @@ export default defineContentScript({
     function wireUi(nodeEl: HTMLElement, commentId: string, commentText: string) {
       if (nodeEl.getAttribute('data-dcbot-wired') === '1') return;
       ensureStyles();
+      if (handled.has(commentId)) {
+        nodeEl.setAttribute('data-dcbot-handled', '1');
+        nodeEl.setAttribute('data-dcbot-wired', '1');
+        nodeEl.querySelector('.dcbot-ui')?.remove();
+        return;
+      }
+
       const ui = adapter.injectActionUi({ el: nodeEl, id: commentId });
       if (ui.getAttribute('data-dcbot-wired') === '1') {
         nodeEl.setAttribute('data-dcbot-wired', '1');
@@ -530,15 +553,6 @@ export default defineContentScript({
       const status = ui.querySelector<HTMLElement>('.dcbot-ui__status');
       const btnGen = ui.querySelector<HTMLButtonElement>('.dcbot-ui__btn--gen');
       const btnInsert = ui.querySelector<HTMLButtonElement>('.dcbot-ui__btn--insert');
-
-      if (handled.has(commentId)) {
-        ui.setAttribute('data-dcbot-handled', '1');
-        nodeEl.setAttribute('data-dcbot-handled', '1');
-        if (status) status.textContent = '처리됨';
-        if (btnGen) btnGen.disabled = true;
-        if (btnInsert) btnInsert.disabled = true;
-        return;
-      }
 
       btnGen?.addEventListener('click', () => handleGenerate(nodeEl, commentId, commentText, ui));
       btnInsert?.addEventListener('click', () => handleInsert(nodeEl, commentId, ui));

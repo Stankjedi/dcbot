@@ -31,9 +31,8 @@ describe('normalizeSettings', () => {
   });
 
   it('respects boolean flags with defaults', () => {
-    const normalized = normalizeSettings({ allowBrowserKeyStorage: true, includeSources: false });
+    const normalized = normalizeSettings({ allowBrowserKeyStorage: true });
     expect(normalized.allowBrowserKeyStorage).toBe(true);
-    expect(normalized.includeSources).toBe(false);
   });
 
   it('defaults to blocking non-local proxy urls', () => {

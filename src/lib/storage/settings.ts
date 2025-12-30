@@ -7,10 +7,11 @@ export type Settings = {
   galleryId: string;
   isMgallery: boolean;
 
+  qaUserInstructions: string;
+
   model: string;
   reasoningEffort: ReasoningEffort;
   maxAnswerChars: number;
-  includeSources: boolean;
 
   searchEnabled: boolean;
   searchLimit: number;
@@ -36,10 +37,11 @@ export const DEFAULT_SETTINGS: Settings = {
   galleryId: 'thesingularity',
   isMgallery: true,
 
+  qaUserInstructions: '',
+
   model: 'gpt-5-mini',
   reasoningEffort: 'high',
-  maxAnswerChars: 400,
-  includeSources: true,
+  maxAnswerChars: 120,
 
   searchEnabled: true,
   searchLimit: 3,
@@ -82,6 +84,13 @@ function toString(value: unknown, fallback: string) {
   return fallback;
 }
 
+function normalizeUserInstructions(value: unknown, fallback: string) {
+  const raw = typeof value === 'string' ? value : fallback;
+  const trimmed = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  // Keep small to avoid sync storage bloat.
+  return trimmed.slice(0, 800);
+}
+
 function toReasoningEffort(value: unknown, fallback: ReasoningEffort): ReasoningEffort {
   if (value === 'low' || value === 'medium' || value === 'high') return value;
   return fallback;
@@ -105,10 +114,11 @@ export function normalizeSettings(raw: unknown): Settings {
     galleryId: toString(raw.galleryId, DEFAULT_SETTINGS.galleryId),
     isMgallery: toBool(raw.isMgallery, DEFAULT_SETTINGS.isMgallery),
 
+    qaUserInstructions: normalizeUserInstructions(raw.qaUserInstructions, DEFAULT_SETTINGS.qaUserInstructions),
+
     model: toString(raw.model, DEFAULT_SETTINGS.model),
     reasoningEffort: toReasoningEffort(raw.reasoningEffort, DEFAULT_SETTINGS.reasoningEffort),
     maxAnswerChars: clampInt(raw.maxAnswerChars, DEFAULT_SETTINGS.maxAnswerChars, 120, 400),
-    includeSources: toBool(raw.includeSources, DEFAULT_SETTINGS.includeSources),
 
     searchEnabled: toBool(raw.searchEnabled, DEFAULT_SETTINGS.searchEnabled),
     searchLimit: clampInt(raw.searchLimit, DEFAULT_SETTINGS.searchLimit, 0, 10),

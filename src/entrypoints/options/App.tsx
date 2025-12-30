@@ -933,15 +933,38 @@ export default function App() {
             </div>
           </label>
 
-          <label className="field check">
-            <input type="checkbox" checked={settings.includeSources} onChange={(e) => update('includeSources', e.target.checked)} />
-            <div className="label">관련 글 링크 포함</div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="label">링크 첨부</div>
+            <div className="muted">답글에 링크(URL)를 첨부하지 않습니다.</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">인스트럭션(QA)</h2>
+        <div className="grid">
+          <label className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="label">추가 지침 (선택)</div>
+            <textarea
+              value={settings.qaUserInstructions}
+              rows={6}
+              placeholder={'예) 반말로 짧게, 디시 말투로 대답해줘\n예) 너무 정색하지 말고 가볍게'}
+              onChange={(e) => update('qaUserInstructions', e.target.value)}
+            />
+            <div className="muted" style={{ marginTop: 6 }}>
+              여기에 적은 내용이 QA 답변 생성 시 인스트럭션에 추가됩니다. (단, 글자수 제한/@/URL 금지는 강제 적용)
+            </div>
+            <div className="row" style={{ marginTop: 6 }}>
+              <button className="btn" onClick={() => update('qaUserInstructions', '')} disabled={!settings.qaUserInstructions.trim()}>
+                초기화
+              </button>
+            </div>
           </label>
         </div>
       </section>
 
       <section className="card">
-        <h2 className="card-title">검색(RAG-lite)</h2>
+        <h2 className="card-title">검색</h2>
         <div className="grid">
           <label className="field check">
             <input type="checkbox" checked={settings.searchEnabled} onChange={(e) => update('searchEnabled', e.target.checked)} />

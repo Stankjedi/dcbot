@@ -82,7 +82,8 @@ body {
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid #d7dce5;
   border-radius: 8px;
   padding: 8px 10px;
@@ -91,7 +92,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: #98a2ff;
   box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.15);
 }

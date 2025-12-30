@@ -16,3 +16,10 @@ export function normalizeForComment(text: string): string {
 
   return normalized;
 }
+
+export function stripUrls(text: string): string {
+  return text
+    .replace(/\bhttps?:\/\/[^\s<>]+/gi, '')
+    .replace(/\bwww\.[^\s<>]+/gi, '')
+    .replace(/\b(?:gall|m)\.dcinside\.com\/[^\s<>]+/gi, '');
+}
