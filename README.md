@@ -1,5 +1,8 @@
 # DCInside 디시봇 (Chrome Extension, MV3)
 
+[![Support](https://img.shields.io/badge/☕_후원하기-ctee.kr-orange?style=for-the-badge)](https://ctee.kr/place/stankjedi)
+[![License](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)](./LICENSE)
+
 디시인사이드 게시글 페이지에서 **내 댓글**의 `@디시봇` 트리거를 감지해 답변을 생성하고, **답글(하위댓글) 입력창에 자동 삽입(선택: 자동 등록)** 까지 도와주는 크롬 확장입니다.
 
 - 기본값: **내 댓글에서만 트리거 허용**, **답변 400자 제한**, **이미 답글이 달린 트리거는 재실행 방지**
