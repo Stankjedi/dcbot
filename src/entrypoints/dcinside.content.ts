@@ -791,7 +791,7 @@ export default defineContentScript({
     else bindObserverToDocument();
 
     // settings update
-    browser.storage.onChanged.addListener((changes, areaName) => {
+    browser.storage.onChanged.addListener((changes: Record<string, { oldValue?: unknown; newValue?: unknown }>, areaName: string) => {
       if (areaName !== 'sync') return;
       if (!changes.settings) return;
       void (async () => {
