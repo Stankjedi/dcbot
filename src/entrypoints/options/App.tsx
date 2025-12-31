@@ -935,7 +935,7 @@ export default function App() {
 
           <div className="field" style={{ gridColumn: '1 / -1' }}>
             <div className="label">링크 첨부</div>
-            <div className="muted">답글에 링크(URL)를 첨부하지 않습니다.</div>
+            <div className="muted">포털 검색 링크(URL) 1개까지 허용합니다. (그 외 URL은 자동 제거)</div>
           </div>
         </div>
       </section>
@@ -943,6 +943,19 @@ export default function App() {
       <section className="card">
         <h2 className="card-title">인스트럭션(QA)</h2>
         <div className="grid">
+          <label className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="label">기본 지침 (내부, 고급)</div>
+            <textarea value={settings.qaBaseInstructions} rows={5} onChange={(e) => update('qaBaseInstructions', e.target.value)} />
+            <div className="muted" style={{ marginTop: 6 }}>
+              QA 답변 생성 시 “기본 역할/말투” 지침입니다. (글자수/“디시봇:” 프리픽스/@ 금지/URL 정책은 강제 적용)
+            </div>
+            <div className="row" style={{ marginTop: 6 }}>
+              <button className="btn" onClick={() => update('qaBaseInstructions', DEFAULT_SETTINGS.qaBaseInstructions)} disabled={settings.qaBaseInstructions.trim() === DEFAULT_SETTINGS.qaBaseInstructions.trim()}>
+                기본값으로 초기화
+              </button>
+            </div>
+          </label>
+
           <label className="field" style={{ gridColumn: '1 / -1' }}>
             <div className="label">추가 지침 (선택)</div>
             <textarea
@@ -952,11 +965,33 @@ export default function App() {
               onChange={(e) => update('qaUserInstructions', e.target.value)}
             />
             <div className="muted" style={{ marginTop: 6 }}>
-              여기에 적은 내용이 QA 답변 생성 시 인스트럭션에 추가됩니다. (단, 글자수 제한/@/URL 금지는 강제 적용)
+              여기에 적은 내용이 QA 답변 생성 시 인스트럭션에 추가됩니다. (단, 글자수/“디시봇:” 프리픽스/@ 금지/URL 정책은 강제 적용)
             </div>
             <div className="row" style={{ marginTop: 6 }}>
               <button className="btn" onClick={() => update('qaUserInstructions', '')} disabled={!settings.qaUserInstructions.trim()}>
                 초기화
+              </button>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">인스트럭션(요약)</h2>
+        <div className="grid">
+          <label className="field" style={{ gridColumn: '1 / -1' }}>
+            <div className="label">기본 지침 (내부, 고급)</div>
+            <textarea value={settings.summaryBaseInstructions} rows={6} onChange={(e) => update('summaryBaseInstructions', e.target.value)} />
+            <div className="muted" style={{ marginTop: 6 }}>
+              요약 생성 시 “기본 역할/형식” 지침입니다. (글자수/“디시봇:” 프리픽스/@ 금지/URL 정책은 강제 적용)
+            </div>
+            <div className="row" style={{ marginTop: 6 }}>
+              <button
+                className="btn"
+                onClick={() => update('summaryBaseInstructions', DEFAULT_SETTINGS.summaryBaseInstructions)}
+                disabled={settings.summaryBaseInstructions.trim() === DEFAULT_SETTINGS.summaryBaseInstructions.trim()}
+              >
+                기본값으로 초기화
               </button>
             </div>
           </label>

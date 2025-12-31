@@ -281,18 +281,24 @@ export function createDcbotService(): DcbotRpc {
 
       if (mode === 'summary') {
         const hasPostContext =
-          (input.postTitle && input.postTitle.trim().length > 0) || (input.postBodyText && input.postBodyText.trim().length > 0);
-        if (!hasPostContext) throw new Error('요약할 글 내용(제목/본문)을 찾지 못했습니다.');
+          (input.postTitle && input.postTitle.trim().length > 0) ||
+          (input.postBodyText && input.postBodyText.trim().length > 0) ||
+          (input.recentComments && input.recentComments.some((c) => c.trim().length > 0));
+        if (!hasPostContext) throw new Error('요약할 글 내용(제목/본문/댓글)을 찾지 못했습니다.');
 
         ({ instructions, input: llmInput } = buildSummaryPrompt({
           postTitle: input.postTitle,
           postBodyText: input.postBodyText,
+          recentComments: input.recentComments?.slice(0, 30),
+          request: question,
+          baseInstructions: settings.summaryBaseInstructions,
           maxAnswerChars: settings.maxAnswerChars,
         }));
       } else {
         ({ instructions, input: llmInput } = buildPrompt({
           question,
           maxAnswerChars: settings.maxAnswerChars,
+          baseInstructions: settings.qaBaseInstructions,
           userInstructions: settings.qaUserInstructions,
         }));
       }
@@ -423,7 +429,9 @@ export function createDcbotService(): DcbotRpc {
         throw error;
       }
 
-      let answer = normalizeForComment(stripUrls(answerText)).replace(/\s*-\s*$/gm, '').trim();
+      let answer = normalizeForComment(stripUrls(answerText, { allowPortalSearchLink: true, maxAllowedPortalSearchLinks: 1 }))
+        .replace(/\s*-\s*$/gm, '')
+        .trim();
       answer = normalizeForComment(answer);
       if (!answer) answer = '답변이 비어있어요. 질문을 더 구체적으로 써줘.';
 

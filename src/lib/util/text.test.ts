@@ -18,4 +18,17 @@ describe('text helpers', () => {
     expect(stripUrls('a www.example.com b')).toBe('a  b');
     expect(stripUrls('a gall.dcinside.com/mgallery/board/view?id=x&no=1 b')).toBe('a  b');
   });
+
+  it('allows a single portal search link when enabled', () => {
+    expect(stripUrls('a https://search.naver.com/search.naver?query=test b', { allowPortalSearchLink: true })).toBe(
+      'a https://search.naver.com/search.naver?query=test b',
+    );
+
+    expect(
+      stripUrls(
+        'a https://example.com x https://search.daum.net/search?w=tot&q=test y https://www.google.com/search?q=test z',
+        { allowPortalSearchLink: true, maxAllowedPortalSearchLinks: 1 },
+      ),
+    ).toBe('a  x https://search.daum.net/search?w=tot&q=test y  z');
+  });
 });

@@ -207,6 +207,35 @@ export default defineContentScript({
       return { title: title || undefined, bodyText: clippedBody || undefined };
     }
 
+    function getPostCommentsContextForSummary(nodeEl: HTMLElement, commentId: string, maxItems = 24): string[] | undefined {
+      const limit = Math.max(0, Math.trunc(maxItems));
+      if (limit === 0) return undefined;
+
+      const root = adapter.findCommentRoot();
+      if (!root) return undefined;
+      const nodes = adapter.listComments(root).slice(0, 1200);
+      if (nodes.length === 0) return undefined;
+
+      const centerIndex = nodes.findIndex((n) => n.id === commentId);
+      const window = pickContextWindow(nodes, centerIndex, limit);
+
+      const normalize = (t: string) => t.replace(/\s+/g, ' ').trim();
+
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const n of window) {
+        const textRaw = normalize(adapter.getCommentText(n));
+        if (!textRaw) continue;
+        if (textRaw.includes(settings.trigger)) continue;
+        const clipped = textRaw.length > 220 ? `${textRaw.slice(0, 220).trimEnd()}…` : textRaw;
+        if (seen.has(clipped)) continue;
+        seen.add(clipped);
+        out.push(clipped);
+      }
+
+      return out.length > 0 ? out : undefined;
+    }
+
     function buildHelpText(trigger: string) {
       return [
         `사용법: ${trigger} <질문>`,
@@ -217,7 +246,16 @@ export default defineContentScript({
 
     function clampAnswer(text: string) {
       const max = settings.maxAnswerChars;
-      const cleaned = text.trim();
+      const PREFIX = '디시봇:';
+      const cleaned = (() => {
+        const raw = text.trim();
+        if (!raw) return '';
+        if (raw.startsWith(PREFIX)) {
+          const rest = raw.slice(PREFIX.length).replace(/^\s+/, '');
+          return rest.length > 0 ? `${PREFIX} ${rest}` : PREFIX;
+        }
+        return `${PREFIX} ${raw}`;
+      })();
       if (max <= 0) return cleaned;
       if (cleaned.length <= max) return cleaned;
       return `${cleaned.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
@@ -320,20 +358,27 @@ export default defineContentScript({
         const summaryMatch =
           qTrim.match(/^summary\s*[:：]?\s*(.*)$/i) ||
           qTrim.match(new RegExp(`^${SUMMARY_KO}\\s*[:：]?\\s*(.*)$`));
-        if (summaryMatch) {
+        const looksLikeSummaryRequest =
+          /\b(tl;?dr|tldr)\b/i.test(qTrim) ||
+          /요약해(?:줘|줄래|줄수|주라)?/.test(qTrim) ||
+          (/요약/.test(qTrim) && /(한\s*줄|두\s*줄|세\s*줄|\d+\s*줄|해줘|해봐|좀|부탁)/.test(qTrim)) ||
+          /정리해(?:줘|줄래|줘)?/.test(qTrim);
+
+        if (summaryMatch || looksLikeSummaryRequest) {
           op = 'summary';
-          const rest = (summaryMatch[1] ?? '').trim();
+          const request = summaryMatch ? (summaryMatch[1] ?? '').trim() : qTrim;
           const { title, bodyText } = getPostContext();
+          const recentComments = getPostCommentsContextForSummary(nodeEl, commentId);
           const result = await svc.generateAnswer({
             commentId,
-            question: rest,
+            question: request,
             mode: 'summary',
             pageUrl: location.href,
             pageGalleryId: pageGallery?.galleryId,
             pageIsMgallery: pageGallery?.isMgallery,
             postTitle: title,
             postBodyText: bodyText,
-            recentComments: undefined,
+            recentComments,
           });
           const answer = clampAnswer(result.answer);
 

@@ -1,3 +1,5 @@
+import { DEFAULT_QA_BASE_INSTRUCTIONS, DEFAULT_SUMMARY_BASE_INSTRUCTIONS } from '@/lib/llm/prompt';
+
 export type ReasoningEffort = 'low' | 'medium' | 'high';
 export type ProviderMode = 'openai_direct' | 'google_gemini' | 'local_proxy';
 export type DirectApiType = 'auto' | 'responses' | 'chat_completions';
@@ -7,7 +9,9 @@ export type Settings = {
   galleryId: string;
   isMgallery: boolean;
 
+  qaBaseInstructions: string;
   qaUserInstructions: string;
+  summaryBaseInstructions: string;
 
   model: string;
   reasoningEffort: ReasoningEffort;
@@ -37,7 +41,9 @@ export const DEFAULT_SETTINGS: Settings = {
   galleryId: 'thesingularity',
   isMgallery: true,
 
+  qaBaseInstructions: DEFAULT_QA_BASE_INSTRUCTIONS,
   qaUserInstructions: '',
+  summaryBaseInstructions: DEFAULT_SUMMARY_BASE_INSTRUCTIONS,
 
   model: 'gpt-5-mini',
   reasoningEffort: 'high',
@@ -91,6 +97,14 @@ function normalizeUserInstructions(value: unknown, fallback: string) {
   return trimmed.slice(0, 800);
 }
 
+function normalizeBaseInstructions(value: unknown, fallback: string) {
+  const raw = typeof value === 'string' ? value : fallback;
+  const trimmed = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!trimmed) return fallback.trim();
+  // Keep small to avoid sync storage bloat.
+  return trimmed.slice(0, 2000);
+}
+
 function toReasoningEffort(value: unknown, fallback: ReasoningEffort): ReasoningEffort {
   if (value === 'low' || value === 'medium' || value === 'high') return value;
   return fallback;
@@ -114,7 +128,9 @@ export function normalizeSettings(raw: unknown): Settings {
     galleryId: toString(raw.galleryId, DEFAULT_SETTINGS.galleryId),
     isMgallery: toBool(raw.isMgallery, DEFAULT_SETTINGS.isMgallery),
 
+    qaBaseInstructions: normalizeBaseInstructions(raw.qaBaseInstructions, DEFAULT_SETTINGS.qaBaseInstructions),
     qaUserInstructions: normalizeUserInstructions(raw.qaUserInstructions, DEFAULT_SETTINGS.qaUserInstructions),
+    summaryBaseInstructions: normalizeBaseInstructions(raw.summaryBaseInstructions, DEFAULT_SETTINGS.summaryBaseInstructions),
 
     model: toString(raw.model, DEFAULT_SETTINGS.model),
     reasoningEffort: toReasoningEffort(raw.reasoningEffort, DEFAULT_SETTINGS.reasoningEffort),

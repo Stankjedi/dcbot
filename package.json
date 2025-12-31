@@ -2,7 +2,7 @@
   "name": "dcinside-dcbot",
   "description": "DCInside @디시봇 답글 자동작성 Chrome Extension (MV3)",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "scripts": {
     "dev": "wxt",
